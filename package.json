@@ -2,13 +2,15 @@
   "name": "connecteam-tasks",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["server", "client"],
+  "workspaces": ["client"],
   "scripts": {
-    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:server": "npm --workspace server run dev",
-    "dev:client": "npm --workspace client run dev"
+    "dev": "wrangler pages dev --proxy 5173 --port 8788 -- npm --workspace client run dev",
+    "dev:client": "npm --workspace client run dev",
+    "build": "npm --workspace client run build",
+    "preview": "npm run build && wrangler pages dev",
+    "deploy": "npm run build && wrangler pages deploy"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "wrangler": "^3.78.0"
   }
 }
