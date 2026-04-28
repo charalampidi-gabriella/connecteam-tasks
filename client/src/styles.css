@@ -66,6 +66,29 @@ body {
   border-radius: 6px;
   background: white;
 }
+.pick-name-arrow {
+  display: inline-block; font-size: 13px; font-weight: 600;
+  color: #b45309; background: #fef3c7; border: 1px dashed #f59e0b;
+  padding: 3px 10px; border-radius: 999px;
+  transform-origin: 80% 50%;
+  animation: wiggle 1.2s ease-in-out infinite;
+}
+@keyframes wiggle {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  25%      { transform: translateX(4px) rotate(3deg); }
+  75%      { transform: translateX(-2px) rotate(-2deg); }
+}
+.user-picker { font-weight: 600; transition: all 0.2s; }
+.user-picker--pulse {
+  border-color: #95d600;
+  background: #f5fce0;
+  color: #1b4458;
+  animation: user-picker-pulse 1.6s ease-in-out infinite;
+}
+@keyframes user-picker-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(149, 214, 0, 0.6); }
+  50%      { box-shadow: 0 0 0 8px rgba(149, 214, 0, 0); }
+}
 @media (max-width: 600px) {
   .app { padding: 12px; gap: 8px; }
   .toolbar h1 { font-size: 16px; flex-basis: 100%; }

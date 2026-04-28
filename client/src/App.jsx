@@ -277,11 +277,16 @@ export default function App() {
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
         </select>
+        {userFilter === "all" && (
+          <span className="pick-name-arrow" aria-hidden="true">👉 pick your name!</span>
+        )}
         <select
           value={userFilter}
           onChange={(e) => setUserFilter(e.target.value)}
+          className={`user-picker${userFilter === "all" ? " user-picker--pulse" : ""}`}
+          aria-label="Filter by user"
         >
-          <option value="all">All users</option>
+          <option value="all">Pick your name ↓</option>
           {sortedUsers.map((u) => (
             <option key={u.userId} value={u.userId}>
               {u.firstName} {u.lastName}
