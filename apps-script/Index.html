@@ -1,0 +1,606 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <base target="_top" />
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1f2937;
+      background: #f9fafb;
+    }
+    .app { display: flex; flex-direction: column; height: 100vh; padding: 16px; gap: 12px; }
+    .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .toolbar h1 { font-size: 18px; margin: 0; }
+    .toolbar select {
+      padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: white;
+    }
+    .calendar-wrap { flex: 1; min-height: 0; }
+    .status { font-size: 13px; color: #6b7280; }
+    .toggle { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .fc-event-title { font-size: 12px; }
+    .due-suffix { color: #6b7280; font-weight: normal; margin-left: 6px; }
+    .pill {
+      display: inline-block; margin-left: 8px; padding: 1px 8px;
+      font-size: 11px; font-weight: 600; border-radius: 999px;
+      vertical-align: middle; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .pill-completed { background: #d1fae5; color: #065f46; }
+    .pill-overdue { background: #fee2e2; color: #991b1b; }
+    .fc .fc-list-event.is-overdue td { background: #fef2f2; }
+    .fc .fc-list-event.is-overdue .fc-list-event-dot { border-color: #dc2626 !important; }
+    .fc .fc-list-event.is-completed td { opacity: 0.7; }
+    .fc .fc-list-event.is-completed .fc-list-event-title { text-decoration: line-through; }
+    .overdue-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; font-size: 12px; font-weight: 600;
+      color: #991b1b; background: #fee2e2;
+      border: 1px solid #fecaca; border-radius: 999px; cursor: pointer;
+    }
+    .overdue-pill.active { background: #991b1b; color: white; border-color: #991b1b; }
+    .overdue-pill.hidden { display: none; }
+    .pick-name-arrow {
+      display: inline-block; font-size: 13px; font-weight: 600;
+      color: #b45309; background: #fef3c7; border: 1px dashed #f59e0b;
+      padding: 3px 10px; border-radius: 999px;
+      transform-origin: 80% 50%;
+      animation: wiggle 1.2s ease-in-out infinite;
+    }
+    .pick-name-arrow.hidden { display: none; }
+    @keyframes wiggle {
+      0%, 100% { transform: translateX(0) rotate(0); }
+      25% { transform: translateX(4px) rotate(3deg); }
+      75% { transform: translateX(-2px) rotate(-2deg); }
+    }
+    .fc .fc-todayBtn-button.nudge-today {
+      position: relative;
+      animation: today-pulse 1.4s ease-in-out infinite;
+    }
+    .fc .fc-todayBtn-button.nudge-today::after {
+      content: "👈 click me!";
+      position: absolute;
+      left: calc(100% + 8px);
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: 600;
+      color: #b45309;
+      background: #fef3c7;
+      border: 1px dashed #f59e0b;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: today-bob 1.2s ease-in-out infinite;
+    }
+    @keyframes today-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+      50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    }
+    @keyframes today-bob {
+      0%, 100% { transform: translate(0, -50%); }
+      50% { transform: translate(3px, -50%); }
+    }
+    .user-select.picked { outline: none; }
+    .refresh-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; font-size: 12px; font-weight: 600;
+      color: #1f2937; background: white;
+      border: 1px solid #d1d5db; border-radius: 999px; cursor: pointer;
+    }
+    .refresh-pill:hover:not(:disabled) { background: #f3f4f6; }
+    .refresh-pill:disabled { opacity: 0.6; cursor: progress; }
+    .refresh-pill .spin { display: inline-block; }
+    .refresh-pill.loading .spin { animation: rp-spin 0.8s linear infinite; }
+    @keyframes rp-spin { to { transform: rotate(360deg); } }
+    .recurring-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; font-size: 12px; font-weight: 600;
+      color: #3730a3; background: #eef2ff;
+      border: 1px solid #c7d2fe; border-radius: 999px; cursor: pointer;
+    }
+    .recurring-pill.active { background: #3730a3; color: white; border-color: #3730a3; }
+    .rec-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.35);
+      opacity: 0; pointer-events: none; transition: opacity .15s ease;
+      z-index: 40;
+    }
+    .rec-backdrop.open { opacity: 1; pointer-events: auto; }
+    .rec-drawer {
+      position: fixed; top: 0; right: 0; height: 100%;
+      width: min(560px, 100%); background: white;
+      box-shadow: -8px 0 24px rgba(15,23,42,0.15);
+      transform: translateX(100%); transition: transform .2s ease;
+      display: flex; flex-direction: column; z-index: 50;
+    }
+    .rec-drawer.open { transform: translateX(0); }
+    .rec-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid #e5e7eb;
+    }
+    .rec-header h2 { margin: 0; font-size: 15px; font-weight: 600; }
+    .rec-close {
+      background: transparent; border: 0; font-size: 18px; cursor: pointer;
+      color: #6b7280; padding: 4px 8px; border-radius: 4px;
+    }
+    .rec-close:hover { background: #f3f4f6; color: #111827; }
+    .rec-body { flex: 1; overflow: auto; padding: 8px 0; }
+    .rec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .rec-table th {
+      font-weight: 500; font-size: 12px; color: #6b7280; text-align: left;
+      padding: 7px 14px; border-bottom: 1.5px solid #e5e7eb;
+      position: sticky; top: 0; background: white;
+    }
+    .rec-table td {
+      padding: 7px 14px; border-bottom: 0.5px solid #f1f5f9; vertical-align: middle;
+    }
+    .rec-person-row td {
+      background: #f9fafb; border-top: 2px solid #e5e7eb;
+      border-bottom: 0.5px solid #e5e7eb; padding: 8px 14px;
+    }
+    .rec-person { font-weight: 600; font-size: 13px; color: #111827; }
+    .rec-task { color: #111827; }
+    .rec-action { font-size: 11px; color: #6b7280; }
+    .rec-freq {
+      display: inline-block; font-size: 11px; padding: 2px 8px;
+      border-radius: 20px; font-weight: 500; white-space: nowrap;
+    }
+    .rec-freq-daily { background: #E6F1FB; color: #0C447C; }
+    .rec-freq-weekly { background: #EAF3DE; color: #3B6D11; }
+    .rec-freq-biweekly { background: #FBEAF0; color: #993556; }
+    .rec-freq-monthly { background: #EEEDFE; color: #3C3489; }
+    .rec-freq-saturday { background: #FAEEDA; color: #854F0B; }
+    @media (max-width: 600px) {
+      .app { padding: 12px; gap: 8px; }
+      .toolbar h1 { font-size: 16px; flex-basis: 100%; }
+      .toolbar select { font-size: 16px; }
+      .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 8px; }
+      .fc .fc-toolbar { gap: 6px; flex-wrap: wrap; }
+      .fc .fc-toolbar-chunk { display: flex; align-items: center; gap: 4px; }
+      .fc .fc-toolbar-title { font-size: 1.05em; }
+      .fc .fc-button { padding: 0.3em 0.55em; font-size: 0.8em; }
+      .fc .fc-timeGridWeek-button,
+      .fc .fc-timeGridDay-button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="toolbar">
+      <h1>Team Tasks Calendar</h1>
+      <select id="boardSelect" style="display:none" disabled></select>
+      <span class="pick-name-arrow" aria-hidden="true">👉 pick your name!</span>
+      <select id="userSelect" class="user-select"><option value="all">All users</option></select>
+      <label class="toggle">
+        <input type="checkbox" id="showCompleted" /> Show completed
+      </label>
+      <button type="button" id="refreshPill" class="refresh-pill" title="Force refresh from Connecteam"><span class="spin">↻</span> Refresh</button>
+      <button type="button" id="recurringPill" class="recurring-pill" title="Recurring tasks by person">↻ Recurring</button>
+      <button type="button" id="overduePill" class="overdue-pill hidden"></button>
+      <span class="status" id="status">Loading...</span>
+    </div>
+    <div class="calendar-wrap" id="calendar"></div>
+  </div>
+
+  <div class="rec-backdrop" id="recBackdrop"></div>
+  <aside class="rec-drawer" id="recDrawer" role="dialog" aria-label="Recurring tasks" aria-hidden="true">
+    <div class="rec-header">
+      <h2>Recurring tasks by person</h2>
+      <button type="button" class="rec-close" id="recClose" aria-label="Close">✕</button>
+    </div>
+    <div class="rec-body">
+      <table class="rec-table">
+        <thead>
+          <tr><th>Task</th><th>Frequency</th><th>Action</th></tr>
+        </thead>
+        <tbody id="recTbody"></tbody>
+      </table>
+    </div>
+  </aside>
+
+  <script>
+    const ALLOWED_FIRST_NAMES = ['Naya','Gaby','Davin','Cici','Jacob','Aldo','Elizabeth','Albert']
+      .map(n => n.toLowerCase());
+
+    const state = {
+      boards: [], users: [], labels: [], tasks: [],
+      boardId: null, userFilter: 'all', showCompleted: false, overdueOnly: false,
+    };
+    let calendar;
+
+    function nowSec() { return Math.floor(Date.now() / 1000); }
+    function isOverdue(t) {
+      return t.dueDate && t.dueDate < nowSec() &&
+             t.status !== 'completed' && !t.isArchived;
+    }
+    function userMatches(t) {
+      return state.userFilter === 'all'
+        ? true
+        : (t.userIds || []).indexOf(Number(state.userFilter)) !== -1;
+    }
+
+    function callServer(fn, ...args) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          [fn](...args);
+      });
+    }
+
+    function backgroundRefresh(fn, ...args) {
+      google.script.run
+        .withSuccessHandler(() => {})
+        .withFailureHandler(() => {})
+        [fn](...args);
+    }
+
+    function userMap() {
+      const m = {};
+      state.users.forEach(u => { m[u.userId] = u.firstName + ' ' + u.lastName; });
+      return m;
+    }
+
+    function labelMap() {
+      const m = {};
+      state.labels.forEach(l => { m[l.id] = l; });
+      return m;
+    }
+
+    function buildEvents() {
+      const um = userMap();
+      const lm = labelMap();
+      const todayStartSec = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
+      const base = state.tasks.filter(t => !t.isArchived).filter(userMatches);
+      const filtered = state.overdueOnly
+        ? base.filter(isOverdue)
+        : base
+            .filter(t => t.startTime || isOverdue(t))
+            .filter(t => state.showCompleted || t.status !== 'completed');
+      return filtered.map(t => {
+        const firstLabel = t.labelIds && t.labelIds[0] ? lm[t.labelIds[0]] : null;
+        const assignees = (t.userIds || []).map(id => um[id] || ('#' + id));
+        const labels = (t.labelIds || []).map(id => lm[id] && lm[id].name).filter(Boolean);
+        const overdue = isOverdue(t);
+        let startSec;
+        if (state.overdueOnly) startSec = t.dueDate || t.startTime;
+        else if (overdue) startSec = todayStartSec;
+        else startSec = t.startTime;
+        const classNames = [];
+        if (overdue) classNames.push('is-overdue');
+        if (t.status === 'completed') classNames.push('is-completed');
+        return {
+          id: t.id,
+          title: t.title,
+          start: new Date(startSec * 1000),
+          end: t.dueDate ? new Date(t.dueDate * 1000) : undefined,
+          backgroundColor: firstLabel ? firstLabel.color : '#6b7280',
+          borderColor: firstLabel ? firstLabel.color : '#6b7280',
+          classNames: classNames,
+          extendedProps: { assignees, labels, status: t.status, overdue: overdue },
+        };
+      });
+    }
+
+    function updateOverduePill() {
+      const count = state.tasks.filter(t => isOverdue(t) && userMatches(t)).length;
+      const pill = document.getElementById('overduePill');
+      if (count === 0) {
+        pill.classList.add('hidden');
+        if (state.overdueOnly) { state.overdueOnly = false; }
+        return;
+      }
+      pill.classList.remove('hidden');
+      pill.textContent = (state.overdueOnly ? '✕ ' : '⚠ ') + count + ' overdue';
+      pill.classList.toggle('active', state.overdueOnly);
+    }
+
+    function render() {
+      const events = buildEvents();
+      calendar.removeAllEvents();
+      calendar.addEventSource(events);
+      document.getElementById('status').textContent = events.length + ' events';
+      updateOverduePill();
+    }
+
+    function populateBoards() {
+      const sel = document.getElementById('boardSelect');
+      sel.innerHTML = '';
+      state.boards.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.name;
+        sel.appendChild(opt);
+      });
+      sel.disabled = state.boards.length <= 1;
+      sel.value = state.boardId;
+    }
+
+    function populateUsers() {
+      const sel = document.getElementById('userSelect');
+      const allowed = state.users
+        .filter(u => !u.isArchived)
+        .filter(u =>
+          ALLOWED_FIRST_NAMES.indexOf((u.firstName || '').trim().toLowerCase()) !== -1 ||
+          ALLOWED_FIRST_NAMES.indexOf((u.lastName || '').trim().toLowerCase()) !== -1)
+        .sort((a, b) => a.firstName.localeCompare(b.firstName));
+      sel.innerHTML = '<option value="all">All users</option>';
+      allowed.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.userId;
+        opt.textContent = u.firstName + ' ' + u.lastName;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function loadBoard(boardId) {
+      document.getElementById('status').textContent = 'Loading...';
+      const data = await callServer('getBoardData', boardId);
+      state.tasks = data.tasks;
+      state.labels = data.labels;
+      render();
+      if (data.stale) backgroundRefresh('refreshBoardData', boardId);
+    }
+
+    function scrollToToday(rootEl) {
+      const today = new Date();
+      const iso = today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0');
+      setTimeout(() => {
+        const root = rootEl || document;
+        const rows = root.querySelectorAll('.fc-list-day');
+        let target = root.querySelector('.fc-list-day[data-date="' + iso + '"]');
+        if (!target) {
+          for (const row of rows) {
+            const d = row.getAttribute('data-date');
+            if (d && d >= iso) { target = row; break; }
+          }
+        }
+        if (target) target.scrollIntoView({ block: 'start', behavior: 'auto' });
+      }, 0);
+    }
+
+    function startTodayNudge() {
+      const btn = document.querySelector('.fc-todayBtn-button');
+      if (btn) btn.classList.add('nudge-today');
+    }
+    function stopTodayNudge() {
+      const btn = document.querySelector('.fc-todayBtn-button');
+      if (btn) btn.classList.remove('nudge-today');
+    }
+
+    function initCalendar() {
+      calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+        initialView: 'listMonth',
+        headerToolbar: {
+          left: 'prev,next todayBtn',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth',
+        },
+        customButtons: {
+          todayBtn: {
+            text: 'today',
+            click: () => {
+              stopTodayNudge();
+              calendar.today();
+              if (calendar.view.type.indexOf('list') === 0) {
+                scrollToToday(calendar.el);
+              }
+            },
+          },
+        },
+        height: '100%',
+        dayMaxEvents: 3,
+        moreLinkClick: 'popover',
+        displayEventEnd: false,
+        views: {
+          listMonth: { eventOrder: 'end,start,title' },
+          listWeek: { eventOrder: 'end,start,title' },
+          listDay: { eventOrder: 'end,start,title' },
+        },
+        datesSet: arg => {
+          if (arg.view.type.indexOf('list') !== 0) return;
+          scrollToToday(arg.el);
+        },
+        eventDidMount: info => {
+          const { assignees, labels, status, overdue } = info.event.extendedProps;
+          info.el.title = [
+            info.event.title,
+            assignees && assignees.length ? 'Assignees: ' + assignees.join(', ') : null,
+            labels && labels.length ? 'Labels: ' + labels.join(', ') : null,
+          ].filter(Boolean).join('\n');
+
+          if (info.view.type.indexOf('list') === 0) {
+            const titleEl = info.el.querySelector('.fc-list-event-title a, .fc-list-event-title');
+            if (titleEl) {
+              if (info.event.end) {
+                const due = info.event.end;
+                const sameDay = info.event.start && due.toDateString() === info.event.start.toDateString();
+                const opts = sameDay
+                  ? { hour: 'numeric', minute: '2-digit' }
+                  : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
+                const suffix = document.createElement('span');
+                suffix.className = 'due-suffix';
+                suffix.textContent = ' (due ' + due.toLocaleString(undefined, opts) + ')';
+                titleEl.appendChild(suffix);
+              }
+              if (status === 'completed') {
+                const pill = document.createElement('span');
+                pill.className = 'pill pill-completed';
+                pill.textContent = 'completed';
+                titleEl.appendChild(pill);
+              } else if (overdue) {
+                const pill = document.createElement('span');
+                pill.className = 'pill pill-overdue';
+                pill.textContent = 'overdue';
+                titleEl.appendChild(pill);
+              }
+            }
+          }
+        },
+      });
+      calendar.render();
+      setTimeout(startTodayNudge, 50);
+    }
+
+    document.getElementById('boardSelect').addEventListener('change', e => {
+      state.boardId = Number(e.target.value);
+      loadBoard(state.boardId);
+    });
+    document.getElementById('userSelect').addEventListener('change', e => {
+      state.userFilter = e.target.value;
+      const arrow = document.querySelector('.pick-name-arrow');
+      if (arrow) arrow.classList.toggle('hidden', state.userFilter !== 'all');
+      render();
+    });
+    document.getElementById('showCompleted').addEventListener('change', e => {
+      state.showCompleted = e.target.checked;
+      render();
+    });
+    document.getElementById('refreshPill').addEventListener('click', async () => {
+      if (state.boardId == null) return;
+      const btn = document.getElementById('refreshPill');
+      btn.disabled = true;
+      btn.classList.add('loading');
+      const status = document.getElementById('status');
+      const prev = status.textContent;
+      status.textContent = 'Refreshing...';
+      try {
+        const data = await callServer('forceRefreshBoardData', state.boardId);
+        state.tasks = data.tasks;
+        state.labels = data.labels;
+        render();
+      } catch (err) {
+        status.textContent = 'Refresh failed: ' + (err.message || err);
+        setTimeout(() => { status.textContent = prev; }, 4000);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+      }
+    });
+    document.getElementById('overduePill').addEventListener('click', () => {
+      state.overdueOnly = !state.overdueOnly;
+      if (state.overdueOnly) calendar.changeView('listYear');
+      render();
+    });
+
+    const RECURRING_DATA = [
+      { person: 'Cici', tasks: [
+        ['Operational Report South', 'daily', 'Daily (Tue–Sat)', 'Check all sections & archive'],
+        ['Daily Facility Walkthrough', 'daily', 'Daily (Tue–Sat)', 'Complete the daily facility walkthrough'],
+        ['CPR Document', 'weekly', 'Weekly (Wed)', 'Check expiring or missing & text staff to renew'],
+        ['Bi-Weekly Count', 'biweekly', 'Bi-weekly (Thu)', 'Count'],
+        ['Coach Call Out Sheet', 'biweekly', 'Bi-weekly (Thu)', 'Check court sheets & record any call outs, late arrivals, etc. not yet logged'],
+        ['Monthly Count', 'monthly', 'Monthly (Wed)', 'Count'],
+      ]},
+      { person: 'Davin', tasks: [
+        ['Operational Report Pharr', 'daily', 'Daily (Tue–Sat)', 'Check all sections & archive'],
+        ['Daily Facility Walkthrough', 'daily', 'Daily (Tue–Sat)', 'Complete the daily facility walkthrough'],
+        ['CPR Document', 'weekly', 'Weekly (Wed)', 'Check expiring or missing & text staff to renew'],
+        ['Court Sheet Check', 'weekly', 'Weekly (Fri)', 'Go through each clinic of the previous week & verify all shortenings are correct'],
+        ['Bi-Weekly Count', 'biweekly', 'Bi-weekly (Thu)', 'Count'],
+        ['Coach Call Out Sheet', 'biweekly', 'Bi-weekly (Thu)', 'Check court sheets & record any call outs, late arrivals, etc. not yet logged'],
+        ['Monthly Count', 'monthly', 'Monthly (Wed)', 'Count'],
+      ]},
+      { person: 'Naya', tasks: [
+        ['Operational Report WILCO', 'daily', 'Daily (Mon–Thu, Sun)', 'Check all sections & archive'],
+        ['Daily Facility Walkthrough', 'daily', 'Daily (Mon–Thu, Sun)', 'Complete the daily facility walkthrough'],
+        ['CPR Document', 'weekly', 'Weekly (Wed)', 'Check expiring or missing & text staff to renew'],
+        ['Bi-Weekly Count', 'biweekly', 'Bi-weekly (Thu)', 'Count'],
+        ['Coach Call Out Sheet', 'biweekly', 'Bi-weekly (Thu)', 'Check court sheets & record any call outs, late arrivals, etc. not yet logged'],
+        ['Monthly Count', 'monthly', 'Monthly (Wed)', 'Count'],
+      ]},
+      { person: 'MOC', tasks: [
+        ['Spam Check Report', 'daily', 'Daily (7 days)', 'Check all sections & archive'],
+        ['Operational Report South & Pharr', 'daily', 'Daily (Mon, Sun)', 'Check all sections & archive'],
+        ['Operational Report WILCO', 'daily', 'Daily (Fri, Sat)', 'Check all sections & archive'],
+      ]},
+      { person: 'Aldo', tasks: [
+        ['Time Off Report', 'saturday', 'Weekly (Sat)', 'Check all time offs & verify no one on time off is scheduled on Connecteam or Club Auto'],
+        ['Court Sheet Check', 'weekly', 'Weekly (Fri)', 'Go through each clinic of the previous week & verify all shortenings are correct'],
+      ]},
+      { person: 'Jacob', tasks: [
+        ['Court Sheet Check', 'weekly', 'Weekly (Fri)', 'Go through each clinic of the previous week & verify all shortenings are correct'],
+      ]},
+    ];
+
+    function renderRecurringTable() {
+      const tbody = document.getElementById('recTbody');
+      tbody.innerHTML = '';
+      RECURRING_DATA.forEach(group => {
+        const headerRow = document.createElement('tr');
+        headerRow.className = 'rec-person-row';
+        const headerCell = document.createElement('td');
+        headerCell.colSpan = 3;
+        const personSpan = document.createElement('span');
+        personSpan.className = 'rec-person';
+        personSpan.textContent = group.person;
+        headerCell.appendChild(personSpan);
+        headerRow.appendChild(headerCell);
+        tbody.appendChild(headerRow);
+        group.tasks.forEach(t => {
+          const tr = document.createElement('tr');
+          const tdName = document.createElement('td');
+          tdName.className = 'rec-task';
+          tdName.textContent = t[0];
+          const tdFreq = document.createElement('td');
+          const freq = document.createElement('span');
+          freq.className = 'rec-freq rec-freq-' + t[1];
+          freq.textContent = t[2];
+          tdFreq.appendChild(freq);
+          const tdAction = document.createElement('td');
+          tdAction.className = 'rec-action';
+          tdAction.textContent = t[3];
+          tr.appendChild(tdName);
+          tr.appendChild(tdFreq);
+          tr.appendChild(tdAction);
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    function setRecurringOpen(open) {
+      const drawer = document.getElementById('recDrawer');
+      const backdrop = document.getElementById('recBackdrop');
+      const pill = document.getElementById('recurringPill');
+      drawer.classList.toggle('open', open);
+      backdrop.classList.toggle('open', open);
+      drawer.setAttribute('aria-hidden', String(!open));
+      pill.classList.toggle('active', open);
+    }
+
+    document.getElementById('recurringPill').addEventListener('click', () => {
+      const isOpen = document.getElementById('recDrawer').classList.contains('open');
+      setRecurringOpen(!isOpen);
+    });
+    document.getElementById('recClose').addEventListener('click', () => setRecurringOpen(false));
+    document.getElementById('recBackdrop').addEventListener('click', () => setRecurringOpen(false));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setRecurringOpen(false); });
+    renderRecurringTable();
+
+    (async function boot() {
+      initCalendar();
+      try {
+        const data = await callServer('getBootstrap');
+        state.boards = data.boards;
+        state.users = data.users;
+        if (data.stale) backgroundRefresh('refreshBootstrap');
+        if (state.boards.length) {
+          state.boardId = state.boards[0].id;
+          populateBoards();
+          populateUsers();
+          await loadBoard(state.boardId);
+        } else {
+          document.getElementById('status').textContent = 'No boards found';
+        }
+      } catch (err) {
+        document.getElementById('status').textContent = 'Error: ' + (err.message || err);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:developer.connecteam.com)",
+      "WebSearch",
+      "Bash(npm install *)"
+    ]
+  }
+}

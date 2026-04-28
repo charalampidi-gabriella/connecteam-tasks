@@ -1,0 +1,14 @@
+{
+  "name": "connecteam-tasks",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["server", "client"],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
